@@ -12,12 +12,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   backend:
     image: ${BACKEND_IMAGE:-jivandabeast/smokesignals-backend}:${IMAGE_TAG:-latest}
     build: ./backend
     environment:
-      SMOKESIGNALS_ENV: ${SMOKESIGNALS_ENV:-development}
+      SMOKESIGNALS_ENV: ${SMOKESIGNALS_ENV:-production}
       SMOKESIGNALS_SECRET_KEY: ${SMOKESIGNALS_SECRET_KEY:-dev-secret-change-me}
       SMOKESIGNALS_DATABASE_URL: postgresql+asyncpg://smokesignals:smokesignals@db:5432/smokesignals
       SMOKESIGNALS_CORS_ORIGINS: ${SMOKESIGNALS_CORS_ORIGINS:-*}
@@ -31,24 +32,22 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ${SMOKESIGNALS_ENV_MOUNT_BACKEND:-./backend/app}:/app/app
       - uploads:/data/uploads
     ports:
       - "8000:8000"
+    restart: unless-stopped
 
   frontend:
     image: ${FRONTEND_IMAGE:-jivandabeast/smokesignals-frontend}:${IMAGE_TAG:-latest}
     build: ./frontend
     environment:
-      SMOKESIGNALS_ENV: ${SMOKESIGNALS_ENV:-development}
+      SMOKESIGNALS_ENV: ${SMOKESIGNALS_ENV:-production}
       VITE_API_TARGET: http://backend:8000
     depends_on:
       - backend
-    volumes:
-      - ${SMOKESIGNALS_ENV_MOUNT_FRONTEND:-./frontend}:/app
-      - /app/node_modules
     ports:
       - "5173:5173"
+    restart: unless-stopped
 
 volumes:
   db-data:

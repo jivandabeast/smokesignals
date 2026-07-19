@@ -1,0 +1,13 @@
+services:
+  backend:
+    environment:
+      SMOKESIGNALS_ENV: development
+    volumes:
+      - ./backend/app:/app/app
+
+  frontend:
+    environment:
+      SMOKESIGNALS_ENV: development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
