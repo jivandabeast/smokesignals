@@ -6,9 +6,10 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
-# Install deps first for better layer caching.
+# Install deps first for better layer caching. We use `npm install` (not `npm ci`)
+# so builds work even without a lockfile; if a lockfile is present it's honored.
 COPY package.json package-lock.json* ./
-RUN npm ci --no-audit --no-fund
+RUN npm install --no-audit --no-fund
 
 # Copy the rest of the source and produce the production bundle.
 COPY . .
@@ -20,7 +21,7 @@ RUN npm run build
 FROM node:20-alpine AS dev
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci --no-audit --no-fund
+RUN npm install --no-audit --no-fund
 COPY . .
 EXPOSE 5173
 CMD ["npm", "run", "dev"]
