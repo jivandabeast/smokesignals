@@ -1,0 +1,132 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..cloudflare import verify_cf_access_jwt
+from ..config import get_settings
+from ..database import get_db
+from ..deps import get_current_user
+from ..models import User
+from ..schemas import (
+    AdminBootstrapStatus,
+    LoginRequest,
+    Token,
+    UserCreate,
+    UserOut,
+)
+from ..security import create_access_token, hash_password, needs_rehash, verify_password
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+settings = get_settings()
+
+
+@router.get("/bootstrap-status", response_model=AdminBootstrapStatus)
+async def bootstrap_status(db: AsyncSession = Depends(get_db)):
+    count = await db.scalar(select(func.count()).select_from(User).where(User.is_admin.is_(True)))
+    return AdminBootstrapStatus(needs_bootstrap=(count or 0) == 0)
+
+
+@router.post("/register-admin", response_model=Token)
+async def register_admin(payload: UserCreate, db: AsyncSession = Depends(get_db)):
+    """Bootstrap the initial admin user. Only allowed when no admin exists."""
+    admin_count = await db.scalar(select(func.count()).select_from(User).where(User.is_admin.is_(True)))
+    if (admin_count or 0) > 0:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin already exists")
+
+    existing = await db.scalar(
+        select(User).where((User.username == payload.username) | (User.email == payload.email))
+    )
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username or email in use")
+
+    user = User(
+        email=payload.email,
+        username=payload.username,
+        nickname=payload.nickname,
+        hashed_password=hash_password(payload.password),
+        is_admin=True,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return Token(access_token=create_access_token(user.id))
+
+
+@router.post("/register", response_model=Token)
+async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
+    existing = await db.scalar(
+        select(User).where((User.username == payload.username) | (User.email == payload.email))
+    )
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username or email in use")
+
+    user = User(
+        email=payload.email,
+        username=payload.username,
+        nickname=payload.nickname,
+        hashed_password=hash_password(payload.password),
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return Token(access_token=create_access_token(user.id))
+
+
+@router.post("/login", response_model=Token)
+async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(User).where((User.username == payload.username) | (User.email == payload.username))
+    )
+    user = result.scalar_one_or_none()
+    if not user or not user.hashed_password or not verify_password(payload.password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User disabled")
+    if needs_rehash(user.hashed_password):
+        user.hashed_password = hash_password(payload.password)
+        await db.commit()
+    return Token(access_token=create_access_token(user.id))
+
+
+@router.post("/cf-exchange", response_model=Token)
+async def cloudflare_exchange(
+    cf_access_jwt: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Exchange a Cloudflare Access JWT for a local session token. Creates the user if it does not exist."""
+    if not settings.cloudflare_access_enabled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cloudflare Access disabled")
+
+    claims = await verify_cf_access_jwt(cf_access_jwt)
+    if not claims:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Cloudflare Access JWT")
+
+    email = claims.get("email")
+    if not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cloudflare Access JWT missing email")
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        base_username = email.split("@")[0]
+        username = base_username
+        i = 1
+        while await db.scalar(select(User).where(User.username == username)):
+            i += 1
+            username = f"{base_username}{i}"
+        user = User(
+            email=email,
+            username=username,
+            nickname=claims.get("name") or base_username,
+            hashed_password=None,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    return Token(access_token=create_access_token(user.id))
+
+
+@router.get("/me", response_model=UserOut)
+async def me(user: User = Depends(get_current_user)):
+    return user
