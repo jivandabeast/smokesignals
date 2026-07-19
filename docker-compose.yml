@@ -39,7 +39,9 @@ services:
 
   frontend:
     image: ${FRONTEND_IMAGE:-jivandabeast/smokesignals-frontend}:${IMAGE_TAG:-latest}
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: prod
     environment:
       SMOKESIGNALS_ENV: ${SMOKESIGNALS_ENV:-production}
       VITE_API_TARGET: http://backend:8000

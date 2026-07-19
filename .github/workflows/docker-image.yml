@@ -28,24 +28,28 @@ jobs:
           - name: backend
             context: ./backend
             image_env: BACKEND_IMAGE
+            target: ""
             platform: linux/amd64
             runs_on: ubuntu-latest
           # backend / arm64 (native arm64 runner — no QEMU)
           - name: backend
             context: ./backend
             image_env: BACKEND_IMAGE
+            target: ""
             platform: linux/arm64
             runs_on: ubuntu-24.04-arm
-          # frontend / amd64
+          # frontend / amd64 — build the `prod` stage (multi-stage Dockerfile)
           - name: frontend
             context: ./frontend
             image_env: FRONTEND_IMAGE
+            target: prod
             platform: linux/amd64
             runs_on: ubuntu-latest
-          # frontend / arm64 (native arm64 runner — no QEMU)
+          # frontend / arm64 — build the `prod` stage (multi-stage Dockerfile)
           - name: frontend
             context: ./frontend
             image_env: FRONTEND_IMAGE
+            target: prod
             platform: linux/arm64
             runs_on: ubuntu-24.04-arm
 
@@ -81,6 +85,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
           platforms: ${{ matrix.platform }}
           push: true
           provenance: false

@@ -6,6 +6,9 @@ services:
       - ./backend/app:/app/app
 
   frontend:
+    build:
+      context: ./frontend
+      target: dev
     environment:
       SMOKESIGNALS_ENV: development
     volumes:
