@@ -30,6 +30,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ])
       setConfig(cfg)
       setNeedsBootstrap(bs.needs_bootstrap)
+
+      if (!getToken() && cfg.cloudflare_access_enabled) {
+        try {
+          const t = await fetch('/api/auth/cf-session', {
+            method: 'POST',
+            credentials: 'include',
+          })
+          if (t.ok) {
+            const data = (await t.json()) as { access_token: string }
+            if (data.access_token) setToken(data.access_token)
+          }
+        } catch {
+          // No CF cookie / not authed through CF yet — fall through to unauthenticated state.
+        }
+      }
+
       if (getToken()) {
         try {
           const me = await api.get<UserOut>('/auth/me')

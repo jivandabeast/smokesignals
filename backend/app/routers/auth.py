@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -123,6 +123,58 @@ async def cloudflare_exchange(
         db.add(user)
         await db.commit()
         await db.refresh(user)
+
+    return Token(access_token=create_access_token(user.id))
+
+
+@router.post("/cf-session", response_model=Token)
+async def cloudflare_session(
+    db: AsyncSession = Depends(get_db),
+    cf_access_jwt_header: str | None = Header(default=None, alias="Cf-Access-Jwt-Assertion"),
+    cf_authorization_cookie: str | None = Cookie(default=None, alias="CF_Authorization"),
+):
+    """Read the CF Access JWT from the request (header or cookie) and mint a local session token.
+
+    This is what the frontend calls on boot when no local token exists — it lets the
+    interactive browser flow (CF_Authorization cookie) log the user in without ever
+    exposing the CF JWT to JavaScript.
+    """
+    if not settings.cloudflare_access_enabled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cloudflare Access disabled")
+
+    token = cf_access_jwt_header or cf_authorization_cookie
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No Cloudflare Access credentials on request")
+
+    claims = await verify_cf_access_jwt(token)
+    if not claims:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Cloudflare Access JWT")
+
+    email = claims.get("email")
+    if not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cloudflare Access JWT missing email")
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        base_username = email.split("@")[0]
+        username = base_username
+        i = 1
+        while await db.scalar(select(User).where(User.username == username)):
+            i += 1
+            username = f"{base_username}{i}"
+        user = User(
+            email=email,
+            username=username,
+            nickname=claims.get("name") or base_username,
+            hashed_password=None,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User disabled")
 
     return Token(access_token=create_access_token(user.id))
 
