@@ -139,6 +139,14 @@ async def cloudflare_session(
     interactive browser flow (CF_Authorization cookie) log the user in without ever
     exposing the CF JWT to JavaScript.
     """
+    print(
+        "[cf-session] enabled=", settings.cloudflare_access_enabled,
+        "header?", bool(cf_access_jwt_header),
+        "cookie?", bool(cf_authorization_cookie),
+        "header_len=", len(cf_access_jwt_header) if cf_access_jwt_header else 0,
+        "cookie_len=", len(cf_authorization_cookie) if cf_authorization_cookie else 0,
+        flush=True,
+    )
     if not settings.cloudflare_access_enabled:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cloudflare Access disabled")
 

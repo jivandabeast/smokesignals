@@ -40,9 +40,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (t.ok) {
             const data = (await t.json()) as { access_token: string }
             if (data.access_token) setToken(data.access_token)
+          } else {
+            let detail = ''
+            try {
+              const body = await t.json()
+              detail = body?.detail ? JSON.stringify(body.detail) : ''
+            } catch {
+              // ignore
+            }
+            console.warn(`[cf-session] ${t.status} ${t.statusText}${detail ? ' — ' + detail : ''}`)
           }
-        } catch {
-          // No CF cookie / not authed through CF yet — fall through to unauthenticated state.
+        } catch (err) {
+          console.warn('[cf-session] network error', err)
         }
       }
 
