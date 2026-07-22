@@ -57,6 +57,10 @@ async def _lightweight_migrate():
         "ALTER TABLE activity_types ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
         "CREATE INDEX IF NOT EXISTS ix_activity_types_group_id ON activity_types(group_id)",
         "CREATE INDEX IF NOT EXISTS ix_activity_types_owner_id ON activity_types(owner_id)",
+        # Normalise avatar paths: legacy rows may have '/api/uploads/...'. The
+        # prod frontend now serves uploads from the ungated '/uploads/*' path,
+        # so rewrite them once at startup. Safe on fresh DBs (no-op).
+        "UPDATE users SET profile_picture = REPLACE(profile_picture, '/api/uploads/', '/uploads/') WHERE profile_picture LIKE '/api/uploads/%'",
     ]
     async with engine.begin() as conn:
         for s in stmts:

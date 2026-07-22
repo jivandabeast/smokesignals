@@ -27,13 +27,12 @@ EXPOSE 5173
 CMD ["npm", "run", "dev"]
 
 # ---------- Stage 3: production runtime ----------
-# Ships ONLY the pre-built static files + a tiny static server. No Node build
-# tools, no source, no dev deps. Fast, small, and no runtime `vite build`.
-FROM node:20-alpine AS prod
-WORKDIR /app
-RUN npm install -g serve@14
-COPY --from=build /app/dist ./dist
+# Serves the built SPA with an nginx that also proxies /api/* to the backend
+# service. This makes the deployment self-contained: browsers only need to
+# reach the frontend container, and both HTML/asset loads AND API/upload
+# requests are handled from the same origin (no CORS, no separate proxy).
+FROM nginx:1.27-alpine AS prod
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 5173
-# `-s` = SPA mode (serve index.html for unknown routes so React Router works)
-# `-l 5173` = listen port
-CMD ["serve", "-s", "dist", "-l", "5173"]
+CMD ["nginx", "-g", "daemon off;"]

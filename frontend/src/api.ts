@@ -52,14 +52,17 @@ export const api = {
 
 /**
  * Normalize a server-supplied asset path (e.g. profile_picture) so the browser
- * fetches it through a route that reliably reaches the backend. Older records
- * were stored as `/uploads/...`, newer ones as `/api/uploads/...`. The prod
- * frontend container only routes `/api/*` to the backend, so we rewrite here.
+ * fetches it through a route that reliably reaches the backend.
+ *
+ * Uploads are served from the ungated `/uploads/*` path via the frontend nginx
+ * proxy so that <img> requests don't need to carry any bearer / access token.
+ * Historically we stored both `/uploads/...` and `/api/uploads/...`; both are
+ * normalised to `/uploads/...` here so existing DB rows keep working.
  */
 export function assetUrl(path: string | null | undefined): string | undefined {
   if (!path) return undefined
   if (/^https?:\/\//i.test(path)) return path
-  if (path.startsWith('/api/')) return path
-  if (path.startsWith('/uploads/')) return `/api${path}`
+  if (path.startsWith('/api/uploads/')) return path.replace(/^\/api/, '')
+  if (path.startsWith('/uploads/')) return path
   return path
 }

@@ -97,7 +97,7 @@ async def upload_avatar(
                 raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File too large")
             await f.write(chunk)
 
-    me.profile_picture = f"/api/uploads/{name}"
+    me.profile_picture = f"/uploads/{name}"
     await db.commit()
     await db.refresh(me)
     return me
