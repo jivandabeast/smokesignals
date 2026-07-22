@@ -83,12 +83,13 @@ async def send_request(user_id: int, db: AsyncSession = Depends(get_db), me: Use
 
     f = Friendship(requester_id=me.id, addressee_id=user_id, status="pending")
     db.add(f)
+    await db.flush()
     n = Notification(
         user_id=user_id,
         kind="friend_request",
         title=f"{me.nickname} wants to connect",
         body="Tap to review the request",
-        data={"from_user_id": me.id},
+        data={"from_user_id": me.id, "request_id": f.id},
     )
     db.add(n)
     await db.commit()

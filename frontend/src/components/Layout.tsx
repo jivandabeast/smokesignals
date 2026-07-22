@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth'
 import { api } from '../api'
+import Avatar from './Avatar'
 import type { AppNotification } from '../types'
 import {
   currentPermission,
@@ -53,6 +54,18 @@ export default function Layout() {
     }
   }, [config])
 
+  useEffect(() => {
+    // The service worker posts {type:'navigate', path} when a push
+    // notification is clicked while the app is already open.
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+    const onMessage = (e: MessageEvent) => {
+      const d = e.data as { type?: string; path?: string } | null
+      if (d && d.type === 'navigate' && d.path) nav(d.path)
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [nav])
+
   const enablePush = async () => {
     if (!config?.vapid_public_key) return
     setEnabling(true)
@@ -92,7 +105,11 @@ export default function Layout() {
             🔔{unread > 0 && <span className="badge">{unread}</span>}
           </NavLink>
           <NavLink to="/profile" className="icon-btn" aria-label="Profile">
-            {user?.profile_picture ? <img src={user.profile_picture} alt="me" /> : '👤'}
+            {user ? (
+              <Avatar user={user} size="small" />
+            ) : (
+              <span>👤</span>
+            )}
           </NavLink>
           <button
             className="icon-btn"

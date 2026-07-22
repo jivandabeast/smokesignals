@@ -17,6 +17,28 @@
   --radius: 14px;
 }
 
+.modal-scrim {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.modal-content {
+  background: var(--bg);
+  padding: 1.5rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -29,7 +51,9 @@ body,
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
@@ -55,6 +79,16 @@ select {
   width: 100%;
 }
 
+/* Checkboxes and radios must not stretch — otherwise their sibling label text
+   gets pushed off narrow screens (a real iPhone regression that doesn't repro
+   in Chrome's device emulator because emulated viewports are wider). */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
 textarea {
   resize: vertical;
 }
@@ -75,6 +109,12 @@ label.row {
   flex-direction: row;
   align-items: center;
   gap: 10px;
+  color: var(--text);
+}
+
+label.row > span {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--text);
 }
 
@@ -111,7 +151,9 @@ fieldset {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  z-index: 10;
+  /* Above Leaflet's map panes (400-700) and controls (800), below its
+     modal popups. Prevents the map from overlaying the header / drawer. */
+  z-index: 1000;
 }
 
 .brand {
@@ -175,7 +217,7 @@ fieldset {
   display: flex;
   justify-content: space-around;
   padding: 6px 0 calc(env(safe-area-inset-bottom) + 6px);
-  z-index: 10;
+  z-index: 1000;
 }
 
 .tab {
@@ -215,7 +257,7 @@ fieldset {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.55);
-  z-index: 40;
+  z-index: 1100;
   animation: fadeIn 120ms ease-out;
 }
 
@@ -226,10 +268,11 @@ fieldset {
   bottom: 0;
   width: min(320px, 86vw);
   background: var(--surface);
-  z-index: 50;
+  z-index: 1200;
   display: flex;
   flex-direction: column;
-  padding: calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px);
+  padding: calc(env(safe-area-inset-top) + 12px) 12px
+    calc(env(safe-area-inset-bottom) + 12px);
   gap: 4px;
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
   animation: slideIn 160ms ease-out;
@@ -276,13 +319,21 @@ fieldset {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideIn {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 .stack {
@@ -437,7 +488,11 @@ button.danger {
   padding: 12px 14px;
   margin-bottom: 12px;
   border-radius: var(--radius);
-  background: linear-gradient(135deg, rgba(74, 163, 223, 0.15), rgba(74, 163, 223, 0.05));
+  background: linear-gradient(
+    135deg,
+    rgba(74, 163, 223, 0.15),
+    rgba(74, 163, 223, 0.05)
+  );
   border: 1px solid rgba(74, 163, 223, 0.35);
 }
 
@@ -702,4 +757,493 @@ button.danger {
     color: var(--danger);
     border-color: var(--danger);
   }
+}
+
+/* ---------- Leaflet clamp so header/tabs/drawer sit on top ---------- */
+.map-wrap {
+  position: relative;
+  isolation: isolate;
+  /* creates its own stacking context so its children can't beat the shell */
+  z-index: 0;
+}
+.map-wrap .leaflet-pane,
+.map-wrap .leaflet-top,
+.map-wrap .leaflet-bottom {
+  z-index: 1;
+}
+.map-wrap .leaflet-popup-pane,
+.map-wrap .leaflet-tooltip-pane {
+  z-index: 2;
+}
+
+/* ---------- Notification list ---------- */
+.notif-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notif-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  min-height: 64px;
+}
+
+.notif-card.unread {
+  background: linear-gradient(180deg, rgba(242, 177, 52, 0.08), var(--surface));
+  border-color: rgba(242, 177, 52, 0.35);
+}
+
+.notif-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 18px;
+  flex: none;
+}
+
+.notif-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.notif-title {
+  font-weight: 600;
+}
+
+.notif-sub {
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.notif-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex: none;
+}
+
+/* ---------- Circles member pills ---------- */
+.member-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.new-circle {
+  border-left: 4px solid var(--primary);
+}
+
+/* ---------- Post: group tabs, type add tile, custom badge ---------- */
+.group-tabs {
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.group-tabs::-webkit-scrollbar {
+  display: none;
+}
+.group-tabs .chip {
+  white-space: nowrap;
+}
+
+.type-tile {
+  position: relative;
+}
+
+.type-tile-add {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.type-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+/* ---------- Friend status list ---------- */
+.friend-status-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.friend-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.friend-status.active {
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.06), var(--surface));
+}
+
+.fs-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fs-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+}
+
+.fs-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+/* ---------- Combo badge (×3 next to activity label) ---------- */
+.combo {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-ink);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 16px;
+  vertical-align: baseline;
+}
+
+/* ---------- Activity card meta line ---------- */
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 6px;
+}
+.card-meta:empty {
+  display: none;
+}
+
+/* ---------- Contact buttons (call / FaceTime / WhatsApp / Signal) ---------- */
+.contact-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.contact-row.compact {
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.contact-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  min-height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.contact-btn:hover,
+.contact-btn:focus-visible {
+  border-color: var(--primary);
+  background: rgba(242, 177, 52, 0.12);
+}
+
+.contact-row.compact .contact-btn {
+  padding: 6px 10px;
+  min-height: 34px;
+  font-size: 12px;
+}
+
+.contact-emoji {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.contact-label {
+  white-space: nowrap;
+}
+
+/* ---------- Kebab menu (friend row actions) ---------- */
+.kebab-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.kebab-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 50%;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kebab-btn:hover,
+.kebab-btn:focus-visible {
+  border-color: var(--primary);
+  background: rgba(242, 177, 52, 0.12);
+}
+
+.kebab-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 180px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  padding: 6px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kebab-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  font-size: 14px;
+  border-radius: calc(var(--radius) - 4px);
+  cursor: pointer;
+}
+
+.kebab-item:hover,
+.kebab-item:focus-visible {
+  background: var(--surface-2);
+}
+
+.kebab-item.danger {
+  color: #ef4444;
+}
+
+.kebab-item.danger:hover,
+.kebab-item.danger:focus-visible {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.kebab-emoji {
+  font-size: 16px;
+  line-height: 1;
+  width: 20px;
+  text-align: center;
+}
+
+/* ---------- Reactions ---------- */
+.reactions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.reaction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  min-height: 30px;
+  cursor: pointer;
+}
+
+.reaction-chip.mine {
+  border-color: var(--primary);
+  background: rgba(242, 177, 52, 0.15);
+}
+
+.reaction-count {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.reaction-chip.mine .reaction-count {
+  color: var(--text);
+}
+
+.reaction-add {
+  color: var(--muted);
+  font-weight: 700;
+  padding: 4px 12px;
+}
+
+.reaction-picker-wrap {
+  position: relative;
+}
+
+.reaction-picker {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  min-width: 220px;
+}
+
+.reaction-picker button.emoji {
+  font-size: 20px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  min-width: 36px;
+  min-height: 36px;
+}
+
+.reaction-picker button.emoji:hover {
+  background: var(--surface-2);
+}
+
+.reaction-custom {
+  flex: 1 1 100%;
+  padding: 6px 8px;
+  font-size: 14px;
+  min-width: 0;
+}
+
+/* ---------- Profile / friend link wrappers ---------- */
+.user-row-link {
+  color: inherit;
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.friend-status-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.avatar-link {
+  display: inline-flex;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ---------- Refreshing indicator ---------- */
+.refresh-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  margin-left: 8px;
+  vertical-align: middle;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---------- Small polish ---------- */
+h1 {
+  margin: 6px 0 4px;
+  font-size: 22px;
+}
+h2 {
+  margin: 12px 0 4px;
+  font-size: 17px;
+}
+h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
 }

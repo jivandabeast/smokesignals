@@ -3,6 +3,7 @@ export interface UserPublic {
   username: string
   nickname: string
   profile_picture?: string | null
+  contact_platforms?: Record<string, string> | null
 }
 
 export interface UserOut extends UserPublic {
@@ -14,6 +15,16 @@ export interface UserOut extends UserPublic {
   created_at: string
 }
 
+export interface ActivityTypeGroup {
+  id: number
+  name: string
+  emoji?: string | null
+  color?: string | null
+  sort_order: number
+  is_active: boolean
+  owner_id?: number | null
+}
+
 export interface ActivityType {
   id: number
   slug: string
@@ -22,6 +33,8 @@ export interface ActivityType {
   color?: string | null
   is_active: boolean
   sort_order: number
+  group_id?: number | null
+  owner_id?: number | null
 }
 
 export interface Activity {
@@ -32,7 +45,17 @@ export interface Activity {
   latitude?: number | null
   longitude?: number | null
   place_label?: string | null
+  duration_minutes?: number | null
   created_at: string
+  reactions?: ReactionSummary[]
+}
+
+export interface FriendStatus {
+  user: UserPublic
+  last_activity: Activity | null
+  combo: number | null
+  is_active_now: boolean
+  expires_in_seconds?: number | null
 }
 
 export interface Circle {
@@ -72,4 +95,18 @@ export interface Stats {
 export interface PublicConfig {
   cloudflare_access_enabled: boolean
   vapid_public_key: string | null
+}
+
+export interface Reaction {
+  id: number
+  user: UserPublic
+  emoji: string
+  created_at: string
+}
+
+export interface ReactionSummary {
+  emoji: string
+  count: number
+  mine: boolean
+  users: UserPublic[]
 }

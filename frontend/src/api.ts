@@ -49,3 +49,17 @@ export const api = {
   upload: <T>(path: string, form: FormData) =>
     request<T>(path, { method: 'POST', body: form }),
 }
+
+/**
+ * Normalize a server-supplied asset path (e.g. profile_picture) so the browser
+ * fetches it through a route that reliably reaches the backend. Older records
+ * were stored as `/uploads/...`, newer ones as `/api/uploads/...`. The prod
+ * frontend container only routes `/api/*` to the backend, so we rewrite here.
+ */
+export function assetUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined
+  if (/^https?:\/\//i.test(path)) return path
+  if (path.startsWith('/api/')) return path
+  if (path.startsWith('/uploads/')) return `/api${path}`
+  return path
+}

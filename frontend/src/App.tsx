@@ -11,6 +11,7 @@ import History from './pages/History'
 import MapView from './pages/MapView'
 import Stats from './pages/Stats'
 import Profile from './pages/Profile'
+import UserProfile from './pages/UserProfile'
 import Admin from './pages/Admin'
 import Notifications from './pages/Notifications'
 import Layout from './components/Layout'
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/map" element={<MapView />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/u/:userId" element={<UserProfile />} />
         {user.is_admin && <Route path="/admin" element={<Admin />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

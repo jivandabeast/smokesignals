@@ -58,17 +58,46 @@ class User(Base):
     )
 
 
+class ActivityTypeGroup(Base):
+    """A grouping of activity types (e.g. 'Drinks' bundles beer/wine/cocktail).
+
+    `owner_id` is null for admin-defined global groups and set for user-defined
+    groups. Users see all global groups plus their own.
+    """
+
+    __tablename__ = "activity_type_groups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(80))
+    emoji: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    color: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class ActivityType(Base):
     __tablename__ = "activity_types"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    slug: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     label: Mapped[str] = mapped_column(String(120))
     emoji: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     color: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("activity_type_groups.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    group: Mapped[Optional["ActivityTypeGroup"]] = relationship("ActivityTypeGroup")
 
 
 class Circle(Base):
@@ -108,6 +137,7 @@ class Activity(Base):
     latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     place_label: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    duration_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     user: Mapped[User] = relationship("User", back_populates="activities")
@@ -139,3 +169,16 @@ class PushSubscription(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship("User", back_populates="push_subscriptions")
+
+
+class Reaction(Base):
+    __tablename__ = "reactions"
+    __table_args__ = (UniqueConstraint("activity_id", "user_id", "emoji", name="uq_reaction_triple"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    activity_id: Mapped[int] = mapped_column(ForeignKey("activities.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    emoji: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship("User")

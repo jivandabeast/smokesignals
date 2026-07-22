@@ -1,21 +1,36 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api'
-import type { FriendRequest, UserPublic } from '../types'
+import Avatar from '../components/Avatar'
+import FriendActionsMenu from '../components/FriendActionsMenu'
+import type { FriendRequest, FriendStatus, UserPublic } from '../types'
+
+function fmtRemaining(sec: number | null | undefined): string | null {
+  if (sec == null) return null
+  if (sec <= 0) return null
+  const m = Math.round(sec / 60)
+  if (m < 60) return `${m}m left`
+  const h = Math.floor(m / 60)
+  const r = m % 60
+  return r ? `${h}h ${r}m left` : `${h}h left`
+}
 
 export default function Friends() {
-  const [friends, setFriends] = useState<UserPublic[]>([])
+  const [statuses, setStatuses] = useState<FriendStatus[]>([])
   const [requests, setRequests] = useState<FriendRequest[]>([])
   const [q, setQ] = useState('')
   const [results, setResults] = useState<UserPublic[]>([])
   const [msg, setMsg] = useState<string | null>(null)
 
   const load = async () => {
-    setFriends(await api.get<UserPublic[]>('/friends'))
+    setStatuses(await api.get<FriendStatus[]>('/activities/friends-status'))
     setRequests(await api.get<FriendRequest[]>('/friends/requests'))
   }
 
   useEffect(() => {
     load()
+    const id = setInterval(load, 30_000)
+    return () => clearInterval(id)
   }, [])
 
   useEffect(() => {
@@ -64,8 +79,14 @@ export default function Friends() {
         <ul className="user-list">
           {results.map((u) => (
             <li key={u.id}>
-              <UserRow user={u} />
-              <button className="secondary" onClick={() => sendRequest(u.id)}>Add</button>
+              <Link to={`/u/${u.id}`} className="user-row user-row-link">
+                <Avatar user={u} size="small" />
+                <div>
+                  <div><strong>{u.nickname}</strong></div>
+                  <div className="muted small">@{u.username}</div>
+                </div>
+              </Link>
+              <button className="secondary small-btn" onClick={() => sendRequest(u.id)}>Add</button>
             </li>
           ))}
         </ul>
@@ -76,11 +97,17 @@ export default function Friends() {
           <h2>Requests</h2>
           <ul className="user-list">
             {requests.map((r) => (
-              <li key={r.id}>
-                <UserRow user={r.requester} />
+              <li key={r.id} id={`request-${r.id}`}>
+                <Link to={`/u/${r.requester.id}`} className="user-row user-row-link">
+                  <Avatar user={r.requester} size="small" />
+                  <div>
+                    <div><strong>{r.requester.nickname}</strong></div>
+                    <div className="muted small">@{r.requester.username}</div>
+                  </div>
+                </Link>
                 <div className="row">
-                  <button className="primary" onClick={() => respond(r.id, true)}>Accept</button>
-                  <button className="danger" onClick={() => respond(r.id, false)}>Decline</button>
+                  <button className="primary small-btn" onClick={() => respond(r.id, true)}>Accept</button>
+                  <button className="danger small-btn" onClick={() => respond(r.id, false)}>Decline</button>
                 </div>
               </li>
             ))}
@@ -90,34 +117,44 @@ export default function Friends() {
 
       <section className="stack">
         <h2>Your circle</h2>
-        {friends.length === 0 && <div className="empty">No friends yet.</div>}
-        <ul className="user-list">
-          {friends.map((f) => (
-            <li key={f.id}>
-              <UserRow user={f} />
-              <button className="danger" onClick={() => removeFriend(f.id)}>Remove</button>
-            </li>
-          ))}
+        {statuses.length === 0 && <div className="empty">No friends yet.</div>}
+        <ul className="friend-status-list">
+          {statuses.map((s) => {
+            const a = s.last_activity
+            const remaining = fmtRemaining(s.expires_in_seconds)
+            return (
+              <li
+                key={s.user.id}
+                id={`user-${s.user.id}`}
+                className={`friend-status ${s.is_active_now ? 'active' : ''}`}
+                style={a?.activity_type?.color ? { borderLeftColor: a.activity_type.color } : undefined}
+              >
+                <Link to={`/u/${s.user.id}`} className="friend-status-link">
+                  <Avatar user={s.user} />
+                  <div className="fs-body">
+                    <div className="fs-row">
+                      <strong>{s.user.nickname}</strong>
+                      {s.is_active_now && <span className="fs-dot" aria-label="active" />}
+                    </div>
+                    {a ? (
+                      <div className="muted small fs-status">
+                        <span>{a.activity_type.emoji || '•'} {a.activity_type.label}</span>
+                        {s.combo && s.combo > 1 && <span className="combo">×{s.combo}</span>}
+                        {a.place_label && <span>· 📍 {a.place_label}</span>}
+                        {remaining && s.is_active_now && <span>· {remaining}</span>}
+                        {!s.is_active_now && <span>· quiet</span>}
+                      </div>
+                    ) : (
+                      <div className="muted small">Hasn't signalled yet.</div>
+                    )}
+                  </div>
+                </Link>
+                <FriendActionsMenu user={s.user} onRemove={() => removeFriend(s.user.id)} />
+              </li>
+            )
+          })}
         </ul>
       </section>
-    </div>
-  )
-}
-
-function UserRow({ user }: { user: UserPublic }) {
-  return (
-    <div className="user-row">
-      <div className="avatar small">
-        {user.profile_picture ? (
-          <img src={user.profile_picture} alt={user.nickname} />
-        ) : (
-          <span>{user.nickname.slice(0, 1).toUpperCase()}</span>
-        )}
-      </div>
-      <div>
-        <div><strong>{user.nickname}</strong></div>
-        <div className="muted small">@{user.username}</div>
-      </div>
     </div>
   )
 }

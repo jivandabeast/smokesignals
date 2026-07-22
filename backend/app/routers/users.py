@@ -4,19 +4,47 @@ from pathlib import Path
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import User
+from ..models import Friendship, User
 from ..schemas import UserOut, UserPublic, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
 settings = get_settings()
 
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+
+async def _is_friend(db: AsyncSession, a: int, b: int) -> bool:
+    if a == b:
+        return True
+    r = await db.execute(
+        select(Friendship).where(
+            and_(
+                Friendship.status == "accepted",
+                or_(
+                    and_(Friendship.requester_id == a, Friendship.addressee_id == b),
+                    and_(Friendship.requester_id == b, Friendship.addressee_id == a),
+                ),
+            )
+        )
+    )
+    return r.scalar_one_or_none() is not None
+
+
+def _public_no_contacts(user: User) -> UserPublic:
+    """Serialise a user for a non-friend audience — contact info is stripped."""
+    return UserPublic(
+        id=user.id,
+        username=user.username,
+        nickname=user.nickname,
+        profile_picture=user.profile_picture,
+        contact_platforms=None,
+    )
 
 
 @router.get("/search", response_model=list[UserPublic])
@@ -31,7 +59,9 @@ async def search_users(q: str, db: AsyncSession = Depends(get_db), me: User = De
         .where(User.id != me.id)
         .limit(25)
     )
-    return result.scalars().all()
+    users = list(result.scalars().all())
+    # Search results include strangers; strip contact info unconditionally here.
+    return [_public_no_contacts(u) for u in users]
 
 
 @router.patch("/me", response_model=UserOut)
@@ -67,16 +97,18 @@ async def upload_avatar(
                 raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File too large")
             await f.write(chunk)
 
-    me.profile_picture = f"/uploads/{name}"
+    me.profile_picture = f"/api/uploads/{name}"
     await db.commit()
     await db.refresh(me)
     return me
 
 
 @router.get("/{user_id}", response_model=UserPublic)
-async def get_user(user_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+async def get_user(user_id: int, db: AsyncSession = Depends(get_db), me: User = Depends(get_current_user)):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Not found")
-    return user
+    if await _is_friend(db, me.id, user.id):
+        return user
+    return _public_no_contacts(user)

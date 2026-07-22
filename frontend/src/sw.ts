@@ -19,18 +19,46 @@ self.addEventListener('push', (event: PushEvent) => {
     badge: '/icons/icon-192.png',
     data: payload.data || {},
   }
-  event.waitUntil(self.registration.showNotification(title, options))
+  event.waitUntil(
+    (async () => {
+      await self.registration.showNotification(title, options)
+      const clientsArr = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      for (const c of clientsArr) {
+        try {
+          ;(c as WindowClient).postMessage({ type: 'notify-update' })
+        } catch {
+          // ignore
+        }
+      }
+    })(),
+  )
 })
+
+function pathForData(data: Record<string, unknown>): string {
+  const kind = String(data.kind || '')
+  if (kind === 'friend_request' || kind === 'friend_accepted') return '/friends'
+  if (kind === 'activity' && data.activity_id) return `/#activity-${data.activity_id}`
+  return '/'
+}
 
 self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close()
+  const data = (event.notification.data || {}) as Record<string, unknown>
+  const targetPath = pathForData(data)
   event.waitUntil(
     (async () => {
       const clientsArr = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       for (const c of clientsArr) {
-        if ('focus' in c) return (c as WindowClient).focus()
+        if ('focus' in c) {
+          try {
+            ;(c as WindowClient).postMessage({ type: 'navigate', path: targetPath })
+          } catch {
+            // ignore
+          }
+          return (c as WindowClient).focus()
+        }
       }
-      if (self.clients.openWindow) await self.clients.openWindow('/')
+      if (self.clients.openWindow) await self.clients.openWindow(targetPath)
     })(),
   )
 })

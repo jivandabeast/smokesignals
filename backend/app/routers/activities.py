@@ -11,7 +11,7 @@ from ..database import get_db
 from ..deps import get_current_user
 from ..models import Activity, ActivityType, Circle, Friendship, Notification, User
 from ..push import send_push_to_user
-from ..schemas import ActivityCreate, ActivityOut, StatsOut
+from ..schemas import ActivityCreate, ActivityOut, FriendStatusOut, StatsOut
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -29,6 +29,22 @@ async def _friend_ids(db: AsyncSession, user_id: int) -> set[int]:
     for f in r.scalars().all():
         ids.add(f.addressee_id if f.requester_id == user_id else f.requester_id)
     return ids
+
+
+async def _attach_reactions(
+    db: AsyncSession, activities: list[Activity], me_id: int
+) -> list[Activity]:
+    """Set a plain `.reactions` attribute on each Activity instance for serialisation."""
+    if not activities:
+        return activities
+    # Local import to avoid circular import at module load time.
+    from .reactions import summaries_for_activities
+
+    ids = [a.id for a in activities]
+    summaries = await summaries_for_activities(db, ids, me_id)
+    for a in activities:
+        a.reactions = summaries.get(a.id, [])
+    return activities
 
 
 @router.post("", response_model=ActivityOut)
@@ -51,6 +67,7 @@ async def create_activity(
         latitude=lat,
         longitude=lon,
         place_label=payload.place_label if me.location_opt_in else None,
+        duration_minutes=payload.duration_minutes,
     )
 
     audience_ids: set[int] = set()
@@ -98,7 +115,9 @@ async def create_activity(
         .where(Activity.id == activity.id)
         .options(selectinload(Activity.user), selectinload(Activity.activity_type))
     )
-    return r.scalar_one()
+    created = r.scalar_one()
+    created.reactions = []
+    return created
 
 
 @router.get("/feed", response_model=list[ActivityOut])
@@ -116,7 +135,7 @@ async def feed(
         .limit(limit)
         .options(selectinload(Activity.user), selectinload(Activity.activity_type))
     )
-    return r.scalars().all()
+    return await _attach_reactions(db, list(r.scalars().all()), me.id)
 
 
 @router.get("/mine", response_model=list[ActivityOut])
@@ -132,7 +151,111 @@ async def mine(
         .limit(limit)
         .options(selectinload(Activity.user), selectinload(Activity.activity_type))
     )
-    return r.scalars().all()
+    return await _attach_reactions(db, list(r.scalars().all()), me.id)
+
+
+DEFAULT_FRESH_WINDOW_MINUTES = 120
+
+
+@router.get("/friends-status", response_model=list[FriendStatusOut])
+async def friends_status(
+    db: AsyncSession = Depends(get_db),
+    me: User = Depends(get_current_user),
+):
+    """One row per friend with their most recent activity + combo count.
+
+    A "combo" is the number of consecutive same-type activities ending with
+    the most recent one, within a 6-hour window between successive posts.
+    """
+    friend_ids = await _friend_ids(db, me.id)
+    if not friend_ids:
+        return []
+
+    # Pull each friend's recent activities (cap so combo counting stays cheap).
+    r = await db.execute(
+        select(Activity)
+        .where(Activity.user_id.in_(friend_ids))
+        .order_by(Activity.user_id, Activity.created_at.desc())
+        .options(selectinload(Activity.user), selectinload(Activity.activity_type))
+    )
+    by_user: dict[int, list[Activity]] = {}
+    for a in r.scalars().all():
+        by_user.setdefault(a.user_id, []).append(a)
+
+    # Attach reactions to just the head activity per friend (only that one is returned).
+    heads = [acts[0] for acts in by_user.values() if acts]
+    await _attach_reactions(db, heads, me.id)
+
+    # Load user records so friends with no activity still appear.
+    r2 = await db.execute(select(User).where(User.id.in_(friend_ids)))
+    users = {u.id: u for u in r2.scalars().all()}
+
+    now = datetime.now(timezone.utc)
+    combo_gap = timedelta(hours=6)
+    out: list[FriendStatusOut] = []
+    for uid, user in users.items():
+        acts = by_user.get(uid, [])
+        if not acts:
+            out.append(FriendStatusOut(user=user, last_activity=None, combo=None, is_active_now=False))
+            continue
+
+        head = acts[0]
+        combo = 1
+        prev = head
+        for a in acts[1:20]:  # look at the last ~20 to build combo
+            if a.activity_type_id != head.activity_type_id:
+                break
+            # Gap between successive same-type posts must stay tight.
+            if (prev.created_at - a.created_at) > combo_gap:
+                break
+            combo += 1
+            prev = a
+
+        # Compute window end.
+        duration = timedelta(minutes=head.duration_minutes or DEFAULT_FRESH_WINDOW_MINUTES)
+        window_end = head.created_at + duration
+        expires_in = int((window_end - now).total_seconds())
+        is_active = expires_in > 0
+
+        out.append(
+            FriendStatusOut(
+                user=user,
+                last_activity=head,
+                combo=combo,
+                is_active_now=is_active,
+                expires_in_seconds=expires_in,
+            )
+        )
+
+    # Sort: active friends first, then most recent activity.
+    out.sort(
+        key=lambda s: (
+            0 if s.is_active_now else 1,
+            -(s.last_activity.created_at.timestamp() if s.last_activity else 0),
+        )
+    )
+    return out
+
+
+@router.get("/user/{user_id}", response_model=list[ActivityOut])
+async def user_activities(
+    user_id: int,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    me: User = Depends(get_current_user),
+):
+    if user_id != me.id:
+        friends = await _friend_ids(db, me.id)
+        if user_id not in friends:
+            raise HTTPException(status_code=403, detail="Not authorized")
+    r = await db.execute(
+        select(Activity)
+        .where(Activity.user_id == user_id)
+        .order_by(Activity.created_at.desc())
+        .limit(limit)
+        .options(selectinload(Activity.user), selectinload(Activity.activity_type))
+    )
+    return await _attach_reactions(db, list(r.scalars().all()), me.id)
 
 
 @router.delete("/{activity_id}", status_code=204)
