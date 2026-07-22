@@ -138,6 +138,7 @@ class Activity(Base):
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     place_label: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     duration_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_private: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     user: Mapped[User] = relationship("User", back_populates="activities")

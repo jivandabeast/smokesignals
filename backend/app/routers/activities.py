@@ -68,10 +68,14 @@ async def create_activity(
         longitude=lon,
         place_label=payload.place_label if me.location_opt_in else None,
         duration_minutes=payload.duration_minutes,
+        is_private=payload.is_private,
     )
 
     audience_ids: set[int] = set()
-    if payload.circle_ids:
+    if payload.is_private:
+        # Private posts skip audience fanout entirely — only the owner ever sees them.
+        activity.circles = []
+    elif payload.circle_ids:
         r = await db.execute(
             select(Circle)
             .where(Circle.id.in_(payload.circle_ids), Circle.owner_id == me.id)
@@ -131,6 +135,8 @@ async def feed(
     r = await db.execute(
         select(Activity)
         .where(Activity.user_id.in_(ids))
+        # Private activities are only ever visible to their own author.
+        .where(or_(Activity.is_private.is_(False), Activity.user_id == me.id))
         .order_by(Activity.created_at.desc())
         .limit(limit)
         .options(selectinload(Activity.user), selectinload(Activity.activity_type))
@@ -175,6 +181,8 @@ async def friends_status(
     r = await db.execute(
         select(Activity)
         .where(Activity.user_id.in_(friend_ids))
+        # Friends' private posts never appear on someone else's Friends screen.
+        .where(Activity.is_private.is_(False))
         .order_by(Activity.user_id, Activity.created_at.desc())
         .options(selectinload(Activity.user), selectinload(Activity.activity_type))
     )
@@ -248,13 +256,17 @@ async def user_activities(
         friends = await _friend_ids(db, me.id)
         if user_id not in friends:
             raise HTTPException(status_code=403, detail="Not authorized")
-    r = await db.execute(
+    q = (
         select(Activity)
         .where(Activity.user_id == user_id)
         .order_by(Activity.created_at.desc())
         .limit(limit)
         .options(selectinload(Activity.user), selectinload(Activity.activity_type))
     )
+    if user_id != me.id:
+        # Never expose another user's private activities.
+        q = q.where(Activity.is_private.is_(False))
+    r = await db.execute(q)
     return await _attach_reactions(db, list(r.scalars().all()), me.id)
 
 

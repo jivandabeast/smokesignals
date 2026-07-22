@@ -26,6 +26,7 @@ export default function Post() {
   const [durationMin, setDurationMin] = useState<number | null>(60)
   const [selectedCircles, setSelectedCircles] = useState<number[]>([])
   const [shareAll, setShareAll] = useState(true)
+  const [isPrivate, setIsPrivate] = useState(false)
   const [attachLocation, setAttachLocation] = useState(!!user?.location_opt_in)
   const [placeLabel, setPlaceLabel] = useState('')
   const [labelSuggested, setLabelSuggested] = useState<{ label: string; distance_m: number } | null>(null)
@@ -195,7 +196,8 @@ export default function Post() {
         longitude: attachLocation && coords ? coords.lon : null,
         place_label: attachLocation && placeLabel ? placeLabel : null,
         duration_minutes: durationMin,
-        circle_ids: shareAll ? null : selectedCircles,
+        circle_ids: isPrivate ? [] : (shareAll ? null : selectedCircles),
+        is_private: isPrivate,
       })
       nav('/')
     } catch (e: any) {
@@ -487,26 +489,38 @@ export default function Post() {
 
       <div className="stack">
         <label className="row">
-          <input type="checkbox" checked={shareAll} onChange={(e) => setShareAll(e.target.checked)} />
-          <span>Share with all friends</span>
+          <input
+            type="checkbox"
+            checked={isPrivate}
+            onChange={(e) => setIsPrivate(e.target.checked)}
+          />
+          <span>🔒 Just for me — private (only visible to you, no notifications)</span>
         </label>
-        {!shareAll && (
-          <div className="chip-row">
-            {circles.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={`chip ${selectedCircles.includes(c.id) ? 'active' : ''}`}
-                style={{ borderColor: c.color || undefined }}
-                onClick={() => toggleCircle(c.id)}
-              >
-                {c.name}
-              </button>
-            ))}
-            {circles.length === 0 && (
-              <span className="muted">No circles yet — create one under Circles.</span>
+        {!isPrivate && (
+          <>
+            <label className="row">
+              <input type="checkbox" checked={shareAll} onChange={(e) => setShareAll(e.target.checked)} />
+              <span>Share with all friends</span>
+            </label>
+            {!shareAll && (
+              <div className="chip-row">
+                {circles.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`chip ${selectedCircles.includes(c.id) ? 'active' : ''}`}
+                    style={{ borderColor: c.color || undefined }}
+                    onClick={() => toggleCircle(c.id)}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+                {circles.length === 0 && (
+                  <span className="muted">No circles yet — create one under Circles.</span>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
 

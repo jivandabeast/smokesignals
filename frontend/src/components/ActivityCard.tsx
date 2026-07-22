@@ -46,10 +46,11 @@ export default function ActivityCard({ activity, combo }: ActivityCardProps) {
   const dur = fmtDuration(activity.duration_minutes)
   const active = isActive(activity)
   const showContacts = active && me && me.id !== activity.user.id
+  const isPrivate = !!activity.is_private
   return (
     <article
       id={`activity-${activity.id}`}
-      className={`card activity-card ${active ? 'is-active' : ''}`}
+      className={`card activity-card ${active ? 'is-active' : ''} ${isPrivate ? 'is-private' : ''}`}
       style={{ borderLeftColor: at.color || '#4aa3df' }}
     >
       <div className="card-head">
@@ -63,6 +64,7 @@ export default function ActivityCard({ activity, combo }: ActivityCardProps) {
             {combo && combo > 1 ? <span className="combo"> ×{combo}</span> : null}
           </span>
         </div>
+        {isPrivate && <span className="badge private" title="Only visible to you">🔒 Private</span>}
         <span className="muted small">{timeAgo(activity.created_at)}</span>
       </div>
       {activity.note && <p className="note">{activity.note}</p>}
@@ -71,7 +73,7 @@ export default function ActivityCard({ activity, combo }: ActivityCardProps) {
         {dur && <span>⏱ {dur}</span>}
       </div>
       {showContacts && <ContactButtons user={activity.user} />}
-      <Reactions activityId={activity.id} initial={activity.reactions} />
+      {!isPrivate && <Reactions activityId={activity.id} initial={activity.reactions} />}
     </article>
   )
 }

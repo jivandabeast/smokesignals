@@ -53,6 +53,7 @@ async def _lightweight_migrate():
     """
     stmts = [
         "ALTER TABLE activities ADD COLUMN IF NOT EXISTS duration_minutes INTEGER",
+        "ALTER TABLE activities ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false",
         "ALTER TABLE activity_types ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES activity_type_groups(id) ON DELETE SET NULL",
         "ALTER TABLE activity_types ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
         "CREATE INDEX IF NOT EXISTS ix_activity_types_group_id ON activity_types(group_id)",

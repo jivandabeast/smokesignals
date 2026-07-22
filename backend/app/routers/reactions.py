@@ -18,6 +18,10 @@ async def _authorize(db: AsyncSession, activity_id: int, me: User) -> Activity:
     if not activity:
         raise HTTPException(status_code=404, detail="Not found")
     if activity.user_id != me.id:
+        # Private activities are invisible to friends; treat as 404 so we
+        # don't even confirm existence.
+        if activity.is_private:
+            raise HTTPException(status_code=404, detail="Not found")
         friends = await _friend_ids(db, me.id)
         if activity.user_id not in friends:
             raise HTTPException(status_code=403, detail="Not authorized")

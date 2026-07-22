@@ -158,6 +158,7 @@ class ActivityCreate(BaseModel):
     place_label: Optional[str] = None
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=24 * 60)
     circle_ids: Optional[list[int]] = None  # None => share with all friends
+    is_private: bool = False
 
 
 class ActivityOut(BaseModel):
@@ -169,6 +170,7 @@ class ActivityOut(BaseModel):
     longitude: Optional[float] = None
     place_label: Optional[str] = None
     duration_minutes: Optional[int] = None
+    is_private: bool = False
     created_at: datetime
     reactions: list["ReactionSummary"] = []
 

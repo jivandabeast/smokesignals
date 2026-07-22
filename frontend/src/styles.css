@@ -950,6 +950,22 @@ button.danger {
   gap: 4px 6px;
 }
 
+/* ---------- Private-activity styling ---------- */
+.activity-card.is-private {
+  border-left-style: dashed;
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.06), transparent);
+}
+.badge.private {
+  position: static;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  margin-left: auto;
+}
+
 /* ---------- Combo badge (×3 next to activity label) ---------- */
 .combo {
   display: inline-block;

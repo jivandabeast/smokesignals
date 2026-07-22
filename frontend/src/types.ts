@@ -46,6 +46,7 @@ export interface Activity {
   longitude?: number | null
   place_label?: string | null
   duration_minutes?: number | null
+  is_private?: boolean
   created_at: string
   reactions?: ReactionSummary[]
 }
