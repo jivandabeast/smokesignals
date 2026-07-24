@@ -81,7 +81,7 @@ export default function Post() {
           setLocating(false)
           setErr(e.message)
         },
-        { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 },
+        { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
       )
     }
   }, [attachLocation, coords])
