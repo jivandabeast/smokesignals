@@ -127,7 +127,7 @@ export default function MapView() {
 
   return (
     <div className="stack">
-      <h1>Your map</h1>
+      <h2>Your map</h2>
 
       {loaded && totalCount === 0 && (
         <div className="empty">

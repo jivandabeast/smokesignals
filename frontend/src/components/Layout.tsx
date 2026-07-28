@@ -131,9 +131,8 @@ export default function Layout() {
               <span className="muted small">@{user?.username}</span>
             </div>
             <NavLink to="/profile" className="drawer-link" onClick={closeMenu}>👤 Profile</NavLink>
-            <NavLink to="/circles" className="drawer-link" onClick={closeMenu}>🫂 Circles</NavLink>
-            <NavLink to="/map" className="drawer-link" onClick={closeMenu}>🗺️ Map</NavLink>
             <NavLink to="/notifications" className="drawer-link" onClick={closeMenu}>🔔 Notifications</NavLink>
+            <NavLink to="/notification-prefs" className="drawer-link" onClick={closeMenu}>🔕 Notification settings</NavLink>
             {user?.is_admin && (
               <NavLink to="/admin" className="drawer-link drawer-admin" onClick={closeMenu}>👑 Admin panel</NavLink>
             )}

@@ -49,6 +49,12 @@ class User(Base):
     profile_picture: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     contact_platforms: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     location_opt_in: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Per-user notification preferences. Shape:
+    #   {"muted_type_ids": [int, ...],
+    #    "muted_group_ids": [int, ...],
+    #    "mute_custom": bool}
+    # Absent/None means "receive everything" (backwards-compatible default).
+    notification_prefs: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     circles: Mapped[list["Circle"]] = relationship("Circle", back_populates="owner", cascade="all, delete-orphan")

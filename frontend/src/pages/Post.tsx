@@ -27,6 +27,7 @@ export default function Post() {
   const [selectedCircles, setSelectedCircles] = useState<number[]>([])
   const [shareAll, setShareAll] = useState(true)
   const [isPrivate, setIsPrivate] = useState(false)
+  const [notifyFriends, setNotifyFriends] = useState(true)
   const [attachLocation, setAttachLocation] = useState(!!user?.location_opt_in)
   const [placeLabel, setPlaceLabel] = useState('')
   const [labelSuggested, setLabelSuggested] = useState<{ label: string; distance_m: number } | null>(null)
@@ -198,6 +199,7 @@ export default function Post() {
         duration_minutes: durationMin,
         circle_ids: isPrivate ? [] : (shareAll ? null : selectedCircles),
         is_private: isPrivate,
+        notify_friends: !isPrivate && notifyFriends,
       })
       nav('/')
     } catch (e: any) {
@@ -498,6 +500,14 @@ export default function Post() {
         </label>
         {!isPrivate && (
           <>
+            <label className="row">
+              <input
+                type="checkbox"
+                checked={notifyFriends}
+                onChange={(e) => setNotifyFriends(e.target.checked)}
+              />
+              <span>🔔 Notify friends (only those who have this activity enabled)</span>
+            </label>
             <label className="row">
               <input type="checkbox" checked={shareAll} onChange={(e) => setShareAll(e.target.checked)} />
               <span>Share with all friends</span>

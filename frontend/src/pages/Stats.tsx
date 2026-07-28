@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api'
+import MapView from './MapView'
 import type { Stats as StatsT } from '../types'
 
 const COLORS = ['#f2b134', '#7a1e3a', '#e94f75', '#6f4e37', '#767676', '#4aa3df', '#22c55e', '#a855f7']
@@ -71,6 +72,9 @@ export default function Stats() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </section>
+      <section>
+        <MapView />
       </section>
     </div>
   )

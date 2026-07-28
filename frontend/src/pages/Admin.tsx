@@ -285,20 +285,61 @@ function GroupsAdmin() {
 
 function UsersAdmin() {
   const [users, setUsers] = useState<UserOut[]>([])
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editEmail, setEditEmail] = useState('')
+  const [editPassword, setEditPassword] = useState('')
+  const [editMsg, setEditMsg] = useState<string | null>(null)
+  const [editBusy, setEditBusy] = useState(false)
+
   const load = async () => setUsers(await api.get<UserOut[]>('/admin/users'))
   useEffect(() => {
     load()
   }, [])
 
+  const startEdit = (u: UserOut) => {
+    setEditingId(u.id)
+    setEditEmail(u.email)
+    setEditPassword('')
+    setEditMsg(null)
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditEmail('')
+    setEditPassword('')
+    setEditMsg(null)
+  }
+
+  const saveEdit = async (u: UserOut) => {
+    const body: { email?: string; password?: string } = {}
+    if (editEmail && editEmail !== u.email) body.email = editEmail
+    if (editPassword) body.password = editPassword
+    if (Object.keys(body).length === 0) {
+      setEditMsg('Nothing to save')
+      return
+    }
+    setEditBusy(true)
+    setEditMsg(null)
+    try {
+      await api.patch(`/admin/users/${u.id}/credentials`, body)
+      await load()
+      cancelEdit()
+    } catch (e: any) {
+      setEditMsg(e.message || 'Failed')
+    } finally {
+      setEditBusy(false)
+    }
+  }
+
   return (
     <ul className="user-list">
       {users.map((u) => (
-        <li key={u.id}>
+        <li key={u.id} className="stack">
           <div>
             <strong>{u.nickname}</strong> <span className="muted small">@{u.username} · {u.email}</span>
-            <div className="muted small">{u.is_admin ? '👑 admin' : ''} {u.is_active ? '' : '· disabled'}</div>
+            <div className="muted small">{u.is_admin ? 'admin' : ''} {u.is_active ? '' : '· disabled'}</div>
           </div>
-          <div className="row">
+          <div className="row wrap">
             <button
               className="secondary small-btn"
               onClick={async () => {
@@ -317,6 +358,9 @@ function UsersAdmin() {
             >
               {u.is_admin ? 'Revoke admin' : 'Make admin'}
             </button>
+            <button className="secondary small-btn" onClick={() => startEdit(u)}>
+              Reset credentials
+            </button>
             <button
               className="danger small-btn"
               onClick={async () => {
@@ -328,6 +372,40 @@ function UsersAdmin() {
               Delete
             </button>
           </div>
+          {editingId === u.id && (
+            <div className="stack card" style={{ background: 'var(--surface-2)' }}>
+              <div className="muted small">Reset credentials for @{u.username}</div>
+              <label>
+                <span>Email</span>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder={u.email}
+                />
+              </label>
+              <label>
+                <span>New password</span>
+                <input
+                  type="password"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="Leave blank to keep current"
+                  autoComplete="new-password"
+                  minLength={8}
+                />
+              </label>
+              {editMsg && <div className="error">{editMsg}</div>}
+              <div className="row">
+                <button className="primary" onClick={() => saveEdit(u)} disabled={editBusy}>
+                  {editBusy ? 'Saving…' : 'Save'}
+                </button>
+                <button className="secondary" onClick={cancelEdit} disabled={editBusy}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </li>
       ))}
     </ul>

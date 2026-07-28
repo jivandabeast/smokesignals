@@ -6,14 +6,13 @@ import BootstrapAdmin from './pages/BootstrapAdmin'
 import Feed from './pages/Feed'
 import Post from './pages/Post'
 import Friends from './pages/Friends'
-import Circles from './pages/Circles'
 import History from './pages/History'
-import MapView from './pages/MapView'
 import Stats from './pages/Stats'
 import Profile from './pages/Profile'
 import UserProfile from './pages/UserProfile'
 import Admin from './pages/Admin'
 import Notifications from './pages/Notifications'
+import NotificationPrefs from './pages/NotificationPrefs'
 import Layout from './components/Layout'
 
 export default function App() {
@@ -46,10 +45,9 @@ export default function App() {
         <Route path="/" element={<Feed />} />
         <Route path="/post" element={<Post />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/notification-prefs" element={<NotificationPrefs />} />
         <Route path="/friends" element={<Friends />} />
-        <Route path="/circles" element={<Circles />} />
         <Route path="/history" element={<History />} />
-        <Route path="/map" element={<MapView />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/u/:userId" element={<UserProfile />} />

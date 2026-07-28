@@ -24,6 +24,7 @@ class UserUpdate(BaseModel):
     contact_platforms: Optional[dict] = None
     location_opt_in: Optional[bool] = None
     profile_picture: Optional[str] = None
+    notification_prefs: Optional["NotificationPrefs"] = None
 
 
 class UserOut(UserBase):
@@ -33,10 +34,31 @@ class UserOut(UserBase):
     profile_picture: Optional[str] = None
     contact_platforms: Optional[dict] = None
     location_opt_in: bool
+    notification_prefs: Optional["NotificationPrefs"] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class NotificationPrefs(BaseModel):
+    """Per-user opt-outs for activity notifications.
+
+    - `muted_type_ids`: don't get pinged for signals of these specific activity types.
+    - `muted_group_ids`: don't get pinged for signals whose activity type is in these groups.
+    - `mute_custom`: single toggle to silence all user-defined (custom) activity types.
+    """
+
+    muted_type_ids: list[int] = Field(default_factory=list)
+    muted_group_ids: list[int] = Field(default_factory=list)
+    mute_custom: bool = False
+
+
+class AdminUserUpdate(BaseModel):
+    """Payload for admin-driven credential changes. All fields optional."""
+
+    email: Optional[EmailStr] = None
+    password: Optional[str] = Field(default=None, min_length=8, max_length=128)
 
 
 class UserPublic(BaseModel):
@@ -159,6 +181,9 @@ class ActivityCreate(BaseModel):
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=24 * 60)
     circle_ids: Optional[list[int]] = None  # None => share with all friends
     is_private: bool = False
+    # When False, skip fanout to friends/circles entirely (still writes the row).
+    # Users can toggle this off if they want to log an activity without pinging anyone.
+    notify_friends: bool = True
 
 
 class ActivityOut(BaseModel):
@@ -258,3 +283,5 @@ class ReactionCreate(BaseModel):
 
 ActivityOut.model_rebuild()
 FriendStatusOut.model_rebuild()
+UserOut.model_rebuild()
+UserUpdate.model_rebuild()

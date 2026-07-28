@@ -47,6 +47,35 @@ async def _attach_reactions(
     return activities
 
 
+async def _filter_by_prefs(
+    db: AsyncSession, audience_ids: set[int], at: ActivityType
+) -> set[int]:
+    """Return the subset of `audience_ids` that has *not* muted this activity type.
+
+    Users express three kinds of opt-outs (see `NotificationPrefs`):
+      - `muted_type_ids`  — silence a specific activity type.
+      - `muted_group_ids` — silence every type in a group.
+      - `mute_custom`     — silence all user-defined types (owner_id is not null).
+
+    Missing prefs => receive everything (the safe default for pre-existing users).
+    """
+    if not audience_ids:
+        return audience_ids
+    is_custom = at.owner_id is not None
+    r = await db.execute(select(User).where(User.id.in_(audience_ids)))
+    keep: set[int] = set()
+    for u in r.scalars().all():
+        prefs = u.notification_prefs or {}
+        if is_custom and prefs.get("mute_custom"):
+            continue
+        if at.id in (prefs.get("muted_type_ids") or []):
+            continue
+        if at.group_id is not None and at.group_id in (prefs.get("muted_group_ids") or []):
+            continue
+        keep.add(u.id)
+    return keep
+
+
 @router.post("", response_model=ActivityOut)
 async def create_activity(
     payload: ActivityCreate,
@@ -72,9 +101,19 @@ async def create_activity(
     )
 
     audience_ids: set[int] = set()
-    if payload.is_private:
-        # Private posts skip audience fanout entirely — only the owner ever sees them.
-        activity.circles = []
+    if payload.is_private or not payload.notify_friends:
+        # Private posts and unmuted-but-notify-disabled posts skip audience fanout.
+        # Circle membership is still recorded so the audience can *see* the post in
+        # their feed, but no notifications or push are dispatched.
+        if payload.is_private:
+            activity.circles = []
+        elif payload.circle_ids:
+            r = await db.execute(
+                select(Circle)
+                .where(Circle.id.in_(payload.circle_ids), Circle.owner_id == me.id)
+                .options(selectinload(Circle.members))
+            )
+            activity.circles = list(r.scalars().all())
     elif payload.circle_ids:
         r = await db.execute(
             select(Circle)
@@ -91,6 +130,10 @@ async def create_activity(
 
     db.add(activity)
     await db.flush()
+
+    # Filter the audience down by each recipient's notification preferences.
+    # This is the server-side privacy/preference gate — never trust the client.
+    audience_ids = await _filter_by_prefs(db, audience_ids, at)
 
     for uid in audience_ids:
         db.add(

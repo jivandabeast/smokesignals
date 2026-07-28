@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 import Avatar from '../components/Avatar'
 import FriendActionsMenu from '../components/FriendActionsMenu'
+import Circles from './Circles'
 import type { FriendRequest, FriendStatus, UserPublic } from '../types'
 
 function fmtRemaining(sec: number | null | undefined): string | null {
@@ -155,6 +156,8 @@ export default function Friends() {
           })}
         </ul>
       </section>
+
+      <Circles />
     </div>
   )
 }

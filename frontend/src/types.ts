@@ -6,12 +6,19 @@ export interface UserPublic {
   contact_platforms?: Record<string, string> | null
 }
 
+export interface NotificationPrefs {
+  muted_type_ids: number[]
+  muted_group_ids: number[]
+  mute_custom: boolean
+}
+
 export interface UserOut extends UserPublic {
   email: string
   is_admin: boolean
   is_active: boolean
   contact_platforms?: Record<string, string> | null
   location_opt_in: boolean
+  notification_prefs?: NotificationPrefs | null
   created_at: string
 }
 

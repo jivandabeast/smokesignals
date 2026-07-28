@@ -67,6 +67,8 @@ async def search_users(q: str, db: AsyncSession = Depends(get_db), me: User = De
 @router.patch("/me", response_model=UserOut)
 async def update_me(payload: UserUpdate, db: AsyncSession = Depends(get_db), me: User = Depends(get_current_user)):
     for k, v in payload.model_dump(exclude_unset=True).items():
+        # `notification_prefs` comes back as a plain dict from model_dump, which
+        # is exactly what the JSON column wants — no extra conversion needed.
         setattr(me, k, v)
     await db.commit()
     await db.refresh(me)
