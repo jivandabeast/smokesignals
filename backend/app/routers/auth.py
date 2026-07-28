@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -185,6 +186,28 @@ async def cloudflare_session(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User disabled")
 
     return Token(access_token=create_access_token(user.id))
+
+
+@router.get("/cf-login")
+async def cloudflare_login(next: str = "/"):
+    """Force an interactive Cloudflare Access challenge and bounce back into the SPA.
+
+    This endpoint is meant to be hit via a top-level browser navigation (not
+    fetch/XHR) so that Cloudflare Access can plant a fresh ``CF_Authorization``
+    cookie in the *current* browser storage partition. This is the workaround
+    for iOS standalone PWAs, where cookies set in a normal Safari session live
+    in a different partition than the home-screen PWA and therefore never reach
+    ``/auth/cf-session``.
+
+    Cloudflare Access itself gates ``/api/auth/*`` at the edge, so simply reaching
+    this handler proves the browser has just been through the interactive login.
+    We then 302 back to the SPA which will call ``/auth/cf-session`` on boot.
+    """
+    if not settings.cloudflare_access_enabled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cloudflare Access disabled")
+    # Only allow same-origin redirects to prevent open-redirect abuse.
+    target = next if next.startswith("/") and not next.startswith("//") else "/"
+    return RedirectResponse(url=target, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/me", response_model=UserOut)

@@ -22,6 +22,15 @@ export default function Login() {
     }
   }
 
+  const signInWithCloudflare = () => {
+    // Top-level navigation (not fetch) so Cloudflare Access can run its
+    // interactive challenge and plant a fresh CF_Authorization cookie in the
+    // current browser storage partition. Critical for iOS standalone PWAs
+    // whose cookie jar is isolated from the Safari-tab jar.
+    const next = encodeURIComponent(window.location.pathname + window.location.search)
+    window.location.href = `/api/auth/cf-login?next=${next}`
+  }
+
   return (
     <div className="auth-screen">
       <div className="auth-card">
@@ -40,7 +49,12 @@ export default function Login() {
           <button className="primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
           <Link to="/register" className="ghost-link">Create an account</Link>
           {config?.cloudflare_access_enabled && (
-            <p className="hint">Cloudflare Access is enabled — you may already be signed in through your identity provider.</p>
+            <>
+              <button type="button" className="secondary" onClick={signInWithCloudflare}>
+                Sign in with Cloudflare
+              </button>
+              <p className="hint">Cloudflare Access is enabled — you may already be signed in through your identity provider.</p>
+            </>
           )}
         </form>
       </div>

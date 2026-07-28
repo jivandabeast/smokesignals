@@ -31,7 +31,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setConfig(cfg)
       setNeedsBootstrap(bs.needs_bootstrap)
 
-      if (!getToken() && cfg.cloudflare_access_enabled) {
+      // Attempt to mint a local session token from a Cloudflare Access
+      // credential (either the CF_Authorization cookie or the injected
+      // Cf-Access-Jwt-Assertion header). Returns true on success.
+      const tryCfSession = async (): Promise<boolean> => {
         try {
           const t = await fetch('/api/auth/cf-session', {
             method: 'POST',
@@ -39,30 +42,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           if (t.ok) {
             const data = (await t.json()) as { access_token: string }
-            if (data.access_token) setToken(data.access_token)
-          } else {
-            let detail = ''
-            try {
-              const body = await t.json()
-              detail = body?.detail ? JSON.stringify(body.detail) : ''
-            } catch {
-              // ignore
+            if (data.access_token) {
+              setToken(data.access_token)
+              return true
             }
-            console.warn(`[cf-session] ${t.status} ${t.statusText}${detail ? ' — ' + detail : ''}`)
+            return false
           }
+          let detail = ''
+          try {
+            const body = await t.json()
+            detail = body?.detail ? JSON.stringify(body.detail) : ''
+          } catch {
+            // ignore
+          }
+          console.warn(`[cf-session] ${t.status} ${t.statusText}${detail ? ' — ' + detail : ''}`)
         } catch (err) {
           console.warn('[cf-session] network error', err)
+        }
+        return false
+      }
+
+      if (!getToken() && cfg.cloudflare_access_enabled) {
+        await tryCfSession()
+      }
+
+      const fetchMe = async (): Promise<boolean> => {
+        try {
+          const me = await api.get<UserOut>('/auth/me')
+          setUser(me)
+          return true
+        } catch {
+          return false
         }
       }
 
       if (getToken()) {
-        try {
-          const me = await api.get<UserOut>('/auth/me')
-          setUser(me)
-        } catch {
-          setToken(null)
-          setUser(null)
+        if (await fetchMe()) return
+        // Local token is expired or otherwise invalid. Wipe it and, if
+        // Cloudflare Access is available, try to mint a fresh one from the
+        // still-live CF cookie/header before giving up.
+        setToken(null)
+        if (cfg.cloudflare_access_enabled && (await tryCfSession()) && (await fetchMe())) {
+          return
         }
+        setToken(null)
+        setUser(null)
       } else {
         setUser(null)
       }
